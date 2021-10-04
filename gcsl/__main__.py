@@ -1,4 +1,5 @@
-from . import play, ReplayBuffer
+from torch.nn.modules.linear import Linear
+from . import play, eval_policy, ReplayBuffer
 import gym
 import numpy as np
 import torch
@@ -11,44 +12,55 @@ import torch.optim as O
 class CartpolePolicyNet(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.nn1 = torch.nn.Linear(5, 200, bias=False)  # obs + goal (position)
-        self.nn2 = torch.nn.Linear(200, 2)
-        self.bn1 = torch.nn.BatchNorm1d(200)
+        self.logits = torch.nn.Sequential(
+            torch.nn.Linear(8, 400, bias=False),
+            torch.nn.BatchNorm1d(400),
+            torch.nn.ReLU(),
+            torch.nn.Linear(400, 300, bias=False),
+            torch.nn.BatchNorm1d(300),
+            torch.nn.ReLU(),
+            torch.nn.Linear(300, 2, bias=True),
+        )
 
     def forward(self, s, g, h):
         del h
-        x = torch.cat((s, g[:, :1]), -1)
-        x = self.nn1(x)
-        x = F.relu(self.bn1(x))
-        x = self.nn2(x)
-        return F.log_softmax(x, -1), D.Categorical(logits=x)
+        x = torch.cat((s, g), -1)
+        logits = self.logits(x)
+        return logits, D.Categorical(logits=logits)
 
-    def predict(self, s, g):
+    def predict(self, s, g, greedy: bool = True):
         s = torch.tensor(s).view(1, 4)
-        g = torch.tensor(g).view(1, 1)
-        _, d = self(s, g, None)
-        return d.sample().item()
+        g = torch.tensor(g).view(1, 4)
+        logits, d = self(s, g, None)
+        if greedy:
+            return torch.argmax(logits).item()
+        else:
+            return d.sample().item()
+
+
+def sample_cartpole_goal():
+    return np.array([np.random.uniform(-4.8, 4.8), 0.0, 0.0, 0.0], dtype=np.float32)
 
 
 def main():
     env = gym.make("CartPole-v1")
-    buffer = ReplayBuffer(100000)
+    buffer = ReplayBuffer(1000000)
     trajectories = play(
         env,
-        lambda: np.random.uniform(-4.8, 4.8),
+        sample_cartpole_goal,
         lambda s, g: env.action_space.sample(),
-        num_episodes=5000,
+        num_episodes=1000,
     )
     buffer.add(trajectories)
     net = CartpolePolicyNet()
-    opt = O.Adam(net.parameters(), lr=1e-3)
+    opt = O.Adam(net.parameters(), lr=5e-4)
 
     for e in range(50000):
         s, g, a, h = buffer.sample_and_relabel(256)
         mask = h > 0
 
-        logprobs, _ = net(s[mask], g[mask], h[mask])
-        loss = F.nll_loss(logprobs, a[mask])
+        logits, _ = net(s[mask], g[mask], h[mask])
+        loss = F.nll_loss(F.log_softmax(logits, dim=-1), a[mask])
         loss.backward()
         opt.step()
 
@@ -57,12 +69,30 @@ def main():
                 net.eval()
                 trajectories = play(
                     env,
-                    lambda: np.random.uniform(-4.8, 4.8),
-                    lambda s, g: net.predict(s, g),
+                    sample_cartpole_goal,
+                    lambda s, g: net.predict(s, g, greedy=True),
                     num_episodes=100,
                 )
+                # trajectories2 = play(
+                #     env,
+                #     lambda: np.random.uniform(-4.8, 4.8),
+                #     lambda s, g: net.predict(s, g, greedy=False),
+                #     num_episodes=100,
+                # )
                 net.train()
             buffer.add(trajectories)
+        if e % 1000 == 0 and loss < 0.3:
+            with torch.no_grad():
+                net.eval()
+                eval_policy(
+                    env,
+                    sample_cartpole_goal,
+                    lambda s, g: net.predict(s, g),
+                    num_episodes=10,
+                    max_steps=500,
+                    render=True,
+                )
+                net.train()
 
         print(loss.item())
 

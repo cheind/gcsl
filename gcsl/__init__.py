@@ -4,6 +4,8 @@ import gym
 import numpy as np
 from typing import List, Tuple, Any
 from collections import deque
+import time
+import copy
 
 
 def play(
@@ -22,12 +24,35 @@ def play(
         for s in range(max_steps):
             action = policy_fn(state, goal)
             new_state, _, done, _ = env.step(action)
-            traj.append((state, action))
-            state = new_state
             if done:
                 break
+            else:
+                traj.append(copy.copy((state, action)))
+            state = new_state
         trajectories.append(traj)
     return trajectories
+
+
+def eval_policy(
+    env: gym.Env,
+    goal_sample_fn: Callable,
+    policy_fn: Callable,
+    num_episodes: int,
+    max_steps: int = 50,
+    render: bool = False,
+):
+    for _ in range(num_episodes):
+        goal = goal_sample_fn()
+        state = env.reset()
+        print(goal)
+        for _ in range(max_steps):
+            action = policy_fn(state, goal)
+            state, _, done, _ = env.step(action)
+            if render:
+                env.render(mode="human")
+                time.sleep(0.5 if done else 0.05)
+            if done:
+                break
 
 
 class ReplayBuffer:
