@@ -80,11 +80,11 @@ class ReplayBuffer:
             max_horizon = 100000
         for idx in indices:
             s, a, h = self.data[idx]
-            h = min(h, max_horizon)
+            offset = int(np.random.randint(1, min(h + 1, max_horizon))) if h > 0 else 0
             states.append(s)
             actions.append(a)
-            horizons.append(h)
-            goals.append(self.data[idx + h][0])
+            horizons.append(offset - 1)
+            goals.append(self.data[idx + offset][0])
         if as_tensor:
             states = torch.tensor(states).float()
             goals = torch.tensor(goals).float()
