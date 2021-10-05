@@ -50,7 +50,7 @@ def eval_policy(
             state, _, done, _ = env.step(action)
             if render:
                 env.render(mode="human")
-                time.sleep(0.5 if done else 0.05)
+                time.sleep(0.5 if done else 0.01)
             if done:
                 break
 
