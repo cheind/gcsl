@@ -10,9 +10,13 @@ from tqdm import trange
 
 
 class CartpolePolicyNet(torch.nn.Module):
+    """The cartpole policy network.
+    A simple fully connected network with two hidden layers.
+    """
+
     def __init__(self):
         super().__init__()
-        self.logits = gcsl.make_fc_layers(5, [400, "A", "D", 300, "A", "D", 2])
+        self.logits = gcsl.make_fc_layers(5, [40, "A", "D", 50, "A", "D", 2])
 
     def forward(self, s, g, h):
         del h
@@ -96,9 +100,9 @@ def main():
                 env,
                 sample_cartpole_goal,
                 lambda s, g: net.predict(s, g),
-                num_episodes=100,
-                max_steps=500,
-                render_freq=100,
+                num_episodes=20,
+                max_steps=200,
+                render_freq=20,
             )
             net.train()
         pbar.set_postfix(
