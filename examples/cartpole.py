@@ -1,8 +1,9 @@
+from typing import List
+
 import gcsl
 import gym
 import numpy as np
 import torch
-import torch.distributions as D
 import torch.nn
 import torch.nn.functional as F
 import torch.optim as O
@@ -10,36 +11,45 @@ from tqdm import trange
 
 
 class CartpolePolicyNet(torch.nn.Module):
-    """The cartpole policy network.
-    A simple fully connected network with two hidden layers.
+    """The cartpole policy network outputting action-logits for state-goal inputs.
+    Realized by a fully connected network with two hidden layers.
     """
 
     def __init__(self):
         super().__init__()
-        self.logits = gcsl.make_fc_layers(5, [40, "A", "D", 50, "A", "D", 2])
+        self.logits = gcsl.make_fc_layers(
+            6, [20, "A", "D", 100, "A", "D", 2], dropout=0.2
+        )
 
     def forward(self, s, g, h):
         del h
-        x = torch.cat((s, g[..., 2:3]), -1)
+        x = torch.cat((s, g), -1)
         logits = self.logits(x)
         return logits
 
-    def predict(self, s, g, egreedy: float = 0.0) -> int:
-        s = torch.tensor(s).view(1, 4)
-        g = torch.tensor(g).view(1, 4)
-        logits = self(s, g, None)
-        if np.random.rand() > egreedy:
-            return torch.argmax(logits).item()
-        else:
-            return D.Categorical(logits=logits).sample().item()
+
+def sample_goal():
+    pos = np.random.uniform(-1.0, 1.0)
+    pole_angle = 0.0
+    return np.array([pos, pole_angle], dtype=np.float32)
 
 
-def sample_cartpole_goal():
-    return np.array([np.random.uniform(-0.5, 0.5), 0.0, 0.0, 0.0], dtype=np.float32)
+def sample_goal_eval():
+    pos = -1.0 if np.random.rand() < 0.5 else 1.0
+    pole_angle = 0.0
+    return np.array([pos, pole_angle], dtype=np.float32)
 
 
-def filter_trajectories(trajectories):
-    return [t for t in trajectories if abs(t[-1][0][2]) < 0.1]
+def relabel_goal(t0: gcsl.SAGHTuple, t1: gcsl.SAGHTuple) -> gcsl.Goal:
+    s, _, _, _ = t1
+    pos = s[0]
+    pole_angle = s[2]
+    return np.array([pos, pole_angle], dtype=np.float32)
+
+
+def filter_trajectories(trajectories: List[gcsl.Trajectory]):
+    ft = [t for t in trajectories if abs(t[-1][0][2]) < 0.1 and len(t) > 20]
+    return ft
 
 
 def main():
@@ -48,7 +58,12 @@ def main():
 
     # Setup the policy-net
     net = CartpolePolicyNet()
-    opt = O.Adam(net.parameters(), lr=1e-4)
+    opt = O.Adam(net.parameters(), lr=1e-3)
+
+    # Create a policy-fn invoking our net. This will be called
+    # during data collection and evaluation, but not used
+    # in training.
+    policy_fn = gcsl.make_policy_fn(net, egreedy=0.00)
 
     # Create a buffer for experiences
     buffer = gcsl.ExperienceBuffer(int(1e6))
@@ -56,10 +71,10 @@ def main():
     # Collected and store experiences from a random policy
     trajectories = gcsl.collect_trajectories(
         env=env,
-        goal_sample_fn=sample_cartpole_goal,
-        policy_fn=lambda s, g: env.action_space.sample(),
-        num_episodes=100,
-        max_steps=100,
+        goal_sample_fn=sample_goal,
+        policy_fn=lambda s, g, h: env.action_space.sample(),
+        num_episodes=10,
+        max_steps=50,
     )
     buffer.insert(trajectories)
 
@@ -69,11 +84,13 @@ def main():
     avg_elen = 0.0
     for e in pbar:
 
+        # np.random.seed(123)
         # Sample a batch
-        s, a, g, h = gcsl.to_tensor(gcsl.sample_buffers(buffer, 256))
+        s, a, g, h = gcsl.to_tensor(gcsl.sample_buffers(buffer, 512, relabel_goal))
         mask = h > 0
 
         # Perform stochastic gradient step
+        opt.zero_grad()
         logits = net(s[mask], g[mask], h[mask])
         loss = F.cross_entropy(logits, a[mask])
         loss.backward()
@@ -86,10 +103,10 @@ def main():
                 net.eval()
                 trajectories = gcsl.collect_trajectories(
                     env,
-                    goal_sample_fn=sample_cartpole_goal,
-                    policy_fn=lambda s, g: net.predict(s, g, egreedy=0.0),
-                    num_episodes=10,
-                    max_steps=100,
+                    goal_sample_fn=sample_goal,
+                    policy_fn=policy_fn,
+                    num_episodes=100,
+                    max_steps=50,
                 )
                 net.train()
             buffer.insert(filter_trajectories(trajectories))
@@ -98,18 +115,19 @@ def main():
             net.eval()
             avg_rewards, avg_elen = gcsl.evaluate_policy(
                 env,
-                sample_cartpole_goal,
-                lambda s, g: net.predict(s, g),
+                goal_sample_fn=sample_goal_eval,
+                policy_fn=policy_fn,
                 num_episodes=20,
-                max_steps=200,
+                max_steps=500,
                 render_freq=20,
             )
             net.train()
-        pbar.set_postfix(
-            loss=loss.item(),
-            avg_rew=f"{avg_rewards:.2f}",
-            avg_elen=f"{avg_elen:.2f}",
-        )
+        if e % 100 == 0:
+            pbar.set_postfix(
+                loss=loss.item(),
+                avg_rew=f"{avg_rewards:.2f}",
+                avg_elen=f"{avg_elen:.2f}",
+            )
     env.close()
 
 

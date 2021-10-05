@@ -19,7 +19,7 @@ with open(THISDIR / "gcsl" / "__version__.py") as ver_file:
 setup(
     name="gcsl",
     author="Christoph Heindl",
-    description="Implementation of goal-conditioned supervised learning (GCSL).",
+    description="Barebone implementation goal-conditioned supervised learning (GCSL).",
     license="MIT",
     long_description=long_description,
     long_description_content_type="text/markdown",

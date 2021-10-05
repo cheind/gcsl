@@ -1,6 +1,5 @@
 import copy
 import itertools
-import multiprocessing as mp
 import time
 from collections import deque
 from typing import Any, Callable, List, Literal, Sequence, Tuple, Type, Union
@@ -8,16 +7,18 @@ from typing import Any, Callable, List, Literal, Sequence, Tuple, Type, Union
 import gym
 import numpy as np
 import torch
+import torch.distributions as D
 import torch.nn
 
 State = Any
 Goal = State
-Action = Any
-StateActionTuple = Tuple[State, Action]
-StateActionGoalHorizonTuple = Tuple[State, Action, State, int]
-Trajectory = List[StateActionTuple]
-PolicyFn = Callable[[State, Goal], int]
+Action = int
+Horizon = int
+SAGHTuple = Tuple[State, Action, State, Horizon]
+Trajectory = List[SAGHTuple]
+PolicyFn = Callable[[State, Goal, Horizon], Action]
 GoalSampleFn = Callable[[], Goal]
+GoalRelabelFn = Callable[[SAGHTuple, SAGHTuple], Goal]
 
 
 def collect_trajectories(
@@ -33,13 +34,18 @@ def collect_trajectories(
         state = env.reset()
         goal = goal_sample_fn()
         traj = []
-        for s in range(max_steps):
-            action = policy_fn(state, goal)
+        for t in range(max_steps):
+            action = policy_fn(state, goal, t)
             new_state, _, done, _ = env.step(action)
-            traj.append(copy.copy((state, action)))
+            traj.append(copy.copy((state, action, goal)))
             state = new_state
             if done:
                 break
+        # Add horizon info
+        T = len(traj)
+        horizons = T - np.arange(T) - 1
+        traj = [t + (h,) for t, h in zip(traj, horizons)]
+        # Finalize trajectory
         trajectories.append(traj)
     return trajectories
 
@@ -65,7 +71,7 @@ def evaluate_policy(
         if render:
             print(goal)
         for t in range(max_steps):
-            action = policy_fn(state, goal)
+            action = policy_fn(state, goal, t)
             state, reward, done, _ = env.step(action)
             rewards.append(reward)
             if render:
@@ -79,7 +85,7 @@ def evaluate_policy(
 
 
 class ExperienceBuffer:
-    """Simple experience buffer of potentially limited capacity.
+    """Experience buffer of limited capacity.
 
     This buffers stores (state, action, horizon) tuples of trajectories
     in a flat memory layout. Here horizon is time (offset >= 0) to tuple
@@ -93,51 +99,51 @@ class ExperienceBuffer:
 
     def __init__(self, max_experiences) -> None:
         self.memory = deque(maxlen=max_experiences)
-        self.lock = mp.Lock()
 
     def insert(self, trajectories: List[Trajectory]):
-        tuples = []
-        for traj in trajectories:
-            T = len(traj)
-            # We insert each element as tuple (o,a,h), where
-            # h is the horizon. Even as old elements get dropped
-            # from deque, elements h steps in the future will
-            # remain valid.
-            horizons = T - np.arange(len(traj)) - 1
-            tuples += [(s, a, h) for (s, a), h in zip(traj, horizons)]
-        with self.lock:
-            for t in tuples:
-                self.memory.append(t)
+        """Append experiences. This might remove oldest values
+        if capacity of the buffer is reached."""
+        for t in itertools.chain(*trajectories):
+            self.memory.append(t)
 
     def sample(
-        self, num_experiences: int, max_horizon: int = None
-    ) -> List[StateActionGoalHorizonTuple]:
+        self,
+        num_experiences: int,
+        goal_relabel_fn: GoalRelabelFn,
+        max_horizon: int = None,
+    ) -> List[SAGHTuple]:
         """Uniform randomly sample N (state,action,goal,horizon) tuples."""
-        with self.lock:
-            indices = np.random.choice(len(self.memory), size=num_experiences)
-            if max_horizon is None:
-                max_horizon = 100000
-            tuples = [self._sample(idx, max_horizon) for idx in indices]
+        indices = np.random.choice(len(self.memory), size=num_experiences)
+        if max_horizon is None:
+            max_horizon = np.iinfo(int).max
+        tuples = [self._relabel(idx, goal_relabel_fn, max_horizon) for idx in indices]
         return tuples
 
     def __len__(self):
         return len(self.memory)
 
-    def _sample(self, idx, max_horizon: int) -> StateActionGoalHorizonTuple:
-        s, a, h = self.memory[idx]
+    def _relabel(
+        self, idx: int, goal_relabel_fn: GoalRelabelFn, max_horizon: int
+    ) -> SAGHTuple:
+        t0 = self.memory[idx]
+        s, a, _, h = t0
         if h > 0:
-            # If not last element of trajectory
+            # If not last element of trajectory, we can sample
+            # a new horizon, which defines the target tuple.
             h = int(np.random.randint(1, min(h + 1, max_horizon)))
-        g = self.memory[idx + h][0]
+        t1 = self.memory[idx + h]
+        # Note, h(t0) >= h(t1)
+        g = goal_relabel_fn(t0, t1)
         return (s, a, g, h)
 
 
 def sample_buffers(
     buffers: Union[ExperienceBuffer, Sequence[ExperienceBuffer]],
     num_experiences: int,
+    goal_relabel_fn: GoalRelabelFn,
     max_horizon: int = None,
     buf_probs: Sequence[float] = None,
-) -> List[StateActionGoalHorizonTuple]:
+) -> List[SAGHTuple]:
     """Sample experiences from a number of buffers.
 
     This function is particularily useful if multiple buffers are to be sampled
@@ -154,14 +160,14 @@ def sample_buffers(
         buf_probs = np.ndarray(buf_probs)
     num_samples_per_buffer = np.random.multinomial(num_experiences, buf_probs)
     nested_tuples = [
-        b.sample(n, max_horizon=max_horizon)
+        b.sample(n, goal_relabel_fn, max_horizon=max_horizon)
         for b, n in zip(buffers, num_samples_per_buffer)
     ]
     return list(itertools.chain(*nested_tuples))
 
 
 def to_tensor(
-    tuples: List[StateActionGoalHorizonTuple],
+    tuples: List[SAGHTuple],
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.LongTensor, torch.IntTensor]:
     """Converts lists of (state,action,goal,horizon) tuples to separate tensors."""
     if len(tuples) > 0:
@@ -177,7 +183,7 @@ def to_tensor(
 
 def make_fc_layers(
     infeatures: int,
-    arch: List[Union[int, Literal["D", "A"]]],
+    arch: List[Union[int, Literal["D", "A", "N"]]],
     dropout: float = 0.1,
     activation: Type[torch.nn.Module] = torch.nn.ReLU,
 ) -> torch.nn.Sequential:
@@ -190,6 +196,26 @@ def make_fc_layers(
             last_c = d
         elif d == "A":
             layers.append(activation())
+        elif d == "N":
+            layers.append(torch.nn.BatchNorm1d(last_c))
         else:
             layers.append(torch.nn.Dropout(p=dropout))
     return torch.nn.Sequential(*layers)
+
+
+def make_policy_fn(net: torch.nn.Module, egreedy: float = 0.0) -> PolicyFn:
+    """Creates a default policy function wrapping a torch.nn.Module returning action-logits.
+    This method will be called for a single (s,a,h) tuple and its components may not be
+    torch types.
+    """
+
+    def predict(s: State, g: Goal, h: Horizon):
+        s = torch.tensor(s).unsqueeze(0)
+        g = torch.tensor(g).unsqueeze(0)
+        logits = net(s, g, h)
+        if np.random.rand() > egreedy:
+            return torch.argmax(logits).item()
+        else:
+            return D.Categorical(logits=logits).sample().item()
+
+    return predict
