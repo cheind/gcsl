@@ -31,14 +31,17 @@ class CartpoleGoalRenderWrapper(gym.Wrapper):
         if goal is not None:
             if self.goal_geom is None:
                 self.env.render(mode="rgb_array", **kwargs)  # prepare
-                self.goal_geom = rendering.Line((0, 100 - 10), (0, 100 + 10))
+                l, r, t, b = -5, 5, 5, -5
+                self.goal_geom = rendering.FilledPolygon(
+                    [(l, b), (l, t), (r, t), (r, b)]
+                )
                 self.goal_geom.set_color(1.0, 0, 0)
                 self.goal_transform = rendering.Transform()
                 self.goal_geom.add_attr(self.goal_transform)
                 self.env.viewer.add_geom(self.goal_geom)
             scale = 600 / (2 * 2.4)
             goalx = goal[0] * scale + 600 / 2.0
-            self.goal_transform.set_translation(goalx, 0)
+            self.goal_transform.set_translation(goalx, 100)
 
         return self.env.render(mode=mode, **kwargs)
 
@@ -142,7 +145,7 @@ def train_agent(args):
             buffer.insert(new_episodes)
             postfix_dict["neweps"] = len(new_episodes)
             postfix_dict["loss"] = loss.item()
-        if e % 5000 == 0:
+        if e % 500 == 0:
             net.eval()
             agm, alen = gcsl.evaluate_policy(
                 env,
