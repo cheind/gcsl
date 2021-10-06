@@ -142,7 +142,7 @@ def train_agent(args):
             buffer.insert(new_episodes)
             postfix_dict["neweps"] = len(new_episodes)
             postfix_dict["loss"] = loss.item()
-        if e % 1000 == 0:
+        if e % 5000 == 0:
             net.eval()
             agm, alen = gcsl.evaluate_policy(
                 env,
