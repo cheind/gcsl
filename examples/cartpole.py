@@ -93,9 +93,9 @@ def filter_trajectories(trajectories: List[gcsl.Trajectory]):
     """Filter trajectories according to length. In our case we simply
     prefer longer sequences over shorter ones.
 
-    Note, being verify picky about which trajectories enter buffer may
-    lead to faster learning, but a) requires domain knowledge and b) may
-    result in less novel experiences, leading to overfitting of the
+    Note, being verify picky about which trajectories enter the replay
+    buffer may lead to faster learning, but a) requires domain knowledge
+    and b) may result in less novel experiences, leading to overfitting of the
     policy on the few experiences in the buffer.
 
     In a sense, being selective here is like shaping the reward in RL.
