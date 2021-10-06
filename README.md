@@ -7,8 +7,6 @@ This repository contains a minimal PyTorch-based implementation of the proposed 
 |:----------:|:------------:|
 | 5,000 steps | 20,000 steps |
 
-
-
 ## Run the code
 Clone this repository, install the requirements and run
 ```
