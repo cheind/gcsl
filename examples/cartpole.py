@@ -10,6 +10,37 @@ import torch.optim as O
 from tqdm import trange
 
 
+class CartpoleGoalRenderWrapper(gym.Wrapper):
+    def __init__(self, env: gym.Env) -> None:
+        super().__init__(env)
+        self.goal = None
+        self.goal_geom = None
+        self.goal_transform = None
+        self.update_goal = False
+
+    def set_goal(self, goal: gcsl.Goal):
+        self.goal = goal
+        self.update_goal = True
+
+    def render(self, mode="human", **kwargs):
+        from gym.envs.classic_control import rendering
+
+        if self.goal_geom is None:
+            self.env.render(mode="rgb_array", **kwargs)  # prepare
+            self.goal_geom = rendering.Line((0, 100 - 10), (0, 100 + 10))
+            self.goal_geom.set_color(1.0, 0, 0)
+            self.goal_transform = rendering.Transform()
+            self.goal_geom.add_attr(self.goal_transform)
+            self.env.viewer.add_geom(self.goal_geom)
+        if self.update_goal:
+            scale = 600 / (2 * 2.4)
+            goalx = self.goal[0] * scale + 600 / 2.0
+            self.update_goal = False
+            self.goal_transform.set_translation(goalx, 0)
+
+        return self.env.render(mode=mode, **kwargs)
+
+
 class CartpolePolicyNet(torch.nn.Module):
     """The cartpole policy network outputting action-logits for state-goal inputs.
     Realized by a fully connected network with two hidden layers.
@@ -55,6 +86,7 @@ def filter_trajectories(trajectories: List[gcsl.Trajectory]):
 def main():
     # Create env
     env = gym.make("CartPole-v1")
+    env = CartpoleGoalRenderWrapper(env)
 
     # Setup the policy-net
     net = CartpolePolicyNet()

@@ -68,8 +68,8 @@ def evaluate_policy(
         render = e % render_freq == 0
         state = env.reset()
         rewards = []
-        if render:
-            print(goal)
+        if render and hasattr(env, "set_goal"):
+            env.set_goal(goal)
         for t in range(max_steps):
             action = policy_fn(state, goal, t)
             state, reward, done, _ = env.step(action)
