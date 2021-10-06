@@ -60,28 +60,25 @@ def evaluate_policy(
     render_freq: bool = False,
 ) -> Tuple[float, float]:
     """Evaluate the policy in the given environment.
-    Returns average rewards and episode lengths."""
-    all_rewards = []
+    Returns average final goal metric and average episode lengths."""
+    goal_metrics = []
     all_lengths = []
     for e in range(1, num_episodes + 1):
         goal = goal_sample_fn()
         render = e % render_freq == 0
         state = env.reset()
-        rewards = []
-        if render and hasattr(env, "set_goal"):
-            env.set_goal(goal)
         for t in range(max_steps):
             action = policy_fn(state, goal, t)
-            state, reward, done, _ = env.step(action)
-            rewards.append(reward)
+            state, _, done, _ = env.step(action)
             if render:
-                env.render(mode="human")
+                env.render(mode="human", goal=goal)
                 time.sleep(0.5 if done else 0.01)
             if done:
                 break
+        if hasattr(env, "goal_metric"):
+            goal_metrics.append(env.goal_metric(state, goal))
         all_lengths.append(t + 1)
-        all_rewards.append(np.sum(rewards))
-    return np.mean(all_rewards), np.mean(all_lengths)
+    return np.mean(goal_metrics), np.mean(all_lengths)
 
 
 class ExperienceBuffer:
@@ -203,7 +200,9 @@ def make_fc_layers(
     return torch.nn.Sequential(*layers)
 
 
-def make_policy_fn(net: torch.nn.Module, egreedy: float = 0.0) -> PolicyFn:
+def make_policy_fn(
+    net: torch.nn.Module, greedy: bool = False, tscaling: float = 0.1
+) -> PolicyFn:
     """Creates a default policy function wrapping a torch.nn.Module returning action-logits.
     This method will be called for a single (s,a,h) tuple and its components may not be
     torch types.
@@ -213,9 +212,10 @@ def make_policy_fn(net: torch.nn.Module, egreedy: float = 0.0) -> PolicyFn:
         s = torch.tensor(s).unsqueeze(0)
         g = torch.tensor(g).unsqueeze(0)
         logits = net(s, g, h)
-        if np.random.rand() > egreedy:
+        if greedy:
             return torch.argmax(logits).item()
         else:
-            return D.Categorical(logits=logits).sample().item()
+            scaled_logits = logits * (1 - tscaling)
+            return D.Categorical(logits=scaled_logits).sample().item()
 
     return predict
