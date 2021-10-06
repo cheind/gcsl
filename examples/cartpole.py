@@ -1,19 +1,25 @@
-from typing import List
 from functools import partial
+from typing import List
+from pathlib import Path
 
-from numpy.core.fromnumeric import var
-
-import gcsl
+import imageio
 import gym
 import numpy as np
 import torch
 import torch.nn
-import torch.nn.functional as F
 import torch.optim as O
 from tqdm import trange
 
+import gcsl
+
 
 class CartpoleGoalRenderWrapper(gym.Wrapper):
+    """A goal-enriched wrapper for the classic Cartpole environment.
+
+    Adds support for rendering goal positions as well as a metric
+    that computes the distances between state and goal.
+    """
+
     def __init__(self, env: gym.Env) -> None:
         super().__init__(env)
         self.goal_geom = None
@@ -48,6 +54,7 @@ class CartpoleGoalRenderWrapper(gym.Wrapper):
 
 class CartpolePolicyNet(torch.nn.Module):
     """The cartpole policy network outputting action-logits for state-goal inputs.
+
     Realized by a fully connected network with two hidden layers.
     """
 
@@ -80,8 +87,6 @@ def relabel_goal(t0: gcsl.SAGHTuple, t1: gcsl.SAGHTuple) -> gcsl.Goal:
 def filter_trajectories(trajectories: List[gcsl.Trajectory]):
     ft = [t for t in trajectories if np.random.rand() > 10 / len(t)]
     return ft
-    # ft = [t for t in trajectories if abs(t[-1][0][2]) < 0.1]
-    # return ft
 
 
 def train_agent(args):
@@ -91,16 +96,15 @@ def train_agent(args):
 
     # Setup the policy-net
     net = CartpolePolicyNet()
-    opt = O.Adam(net.parameters(), lr=1e-4)
+    opt = O.Adam(net.parameters(), lr=args.lr)
 
     # Create a policy-fn invoking our net. This will be called
-    # during data collection and evaluation, but not used
-    # in training.
+    # during data collection and evaluation, but not used in training.
     collect_policy_fn = gcsl.make_policy_fn(net, greedy=False, tscaling=0.1)
     eval_policy_fn = gcsl.make_policy_fn(net, greedy=True)
 
     # Create a buffer for experiences
-    buffer = gcsl.ExperienceBuffer(int(1e6))
+    buffer = gcsl.ExperienceBuffer(args.buffer_size)
 
     # Collected and store experiences from a random policy
     trajectories = gcsl.collect_trajectories(
@@ -113,24 +117,14 @@ def train_agent(args):
     buffer.insert(trajectories)
 
     # Main GCSL loop
-    pbar = trange(1, 100000, unit="steps")
+    pbar = trange(1, args.num_steps + 1, unit="steps")
     postfix_dict = {"agm": 0.0, "alen": 0.0, "neweps": 0, "loss": 0.0}
     for e in pbar:
-
-        # Sample a batch
-        s, a, g, h = gcsl.to_tensor(gcsl.sample_buffers(buffer, 512, relabel_goal))
-        mask = h > 0
-
-        # Perform stochastic gradient step
-        opt.zero_grad()
-        logits = net(s[mask], g[mask], h[mask])
-        loss = F.cross_entropy(logits, a[mask])
-        loss.backward()
-        opt.step()
+        # Perform a single GCSL training step
+        loss = gcsl.gcsl_step(net, opt, buffer, relabel_goal)
 
         if e % 100 == 0:
-            # Every now and then, sample new trajectories
-            # Add trajectories according to some filter criterium
+            # Every now and then, sample new experiences
             with torch.no_grad():
                 net.eval()
                 trajectories = gcsl.collect_trajectories(
@@ -141,11 +135,13 @@ def train_agent(args):
                     max_steps=400,
                 )
                 net.train()
+            # Optionally filter the trajectories
             new_episodes = filter_trajectories(trajectories)
             buffer.insert(new_episodes)
             postfix_dict["neweps"] = len(new_episodes)
             postfix_dict["loss"] = loss.item()
-        if e % 500 == 0:
+        if e % 5000 == 0:
+            # Evaluate the policy and save model
             net.eval()
             agm, alen = gcsl.evaluate_policy(
                 env,
@@ -171,32 +167,46 @@ def eval_agent(args):
     net = CartpolePolicyNet()
     net.load_state_dict(torch.load(args.weights))
     eval_policy_fn = gcsl.make_policy_fn(net, greedy=True)
+    if args.seed is not None:
+        np.random.seed(args.seed)
 
-    agm, alen = gcsl.evaluate_policy(
+    result = gcsl.evaluate_policy(
         env,
         goal_sample_fn=partial(sample_goal, xrange=(args.goal_xmin, args.goal_xmax)),
         policy_fn=eval_policy_fn,
         num_episodes=args.num_episodes,
         max_steps=args.max_steps,
         render_freq=args.render_freq,
+        return_images=args.save_gif,
     )
     env.close()
+    avg_metric, avg_lens = result[:2]
+    print("avg-metric", avg_metric, "avg-len", avg_lens)
+    if args.save_gif:
+        imageio.mimsave(f"./tmp/{Path(args.weights).stem}.gif", result[-1][::2], fps=60)
 
 
 def main():
     import argparse
-    from pathlib import Path
 
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     parser_train = subparsers.add_parser("train", help="train cartpole agent")
     parser_train.set_defaults(func=train_agent)
+    parser_train.add_argument("-lr", type=float, default=1e-4, help="learning rate")
+    parser_train.add_argument(
+        "-num_steps", type=int, default=int(1e5), help="number of GCSL steps"
+    )
+    parser_train.add_argument(
+        "-buffer-size", type=int, default=int(1e6), help="capacity of buffer"
+    )
 
     parser_eval = subparsers.add_parser("eval", help="eval cartpole agent")
+    parser_eval.set_defaults(func=eval_agent)
     parser_eval.add_argument("weights", type=Path, help="agent policy weights")
     parser_eval.add_argument(
-        "-num-episodes", type=int, default=20, help="number of episodes to run"
+        "-num-episodes", type=int, default=2, help="number of episodes to run"
     )
     parser_eval.add_argument(
         "-max-steps", type=int, default=500, help="max steps per episode"
@@ -204,9 +214,13 @@ def main():
     parser_eval.add_argument(
         "-render-freq", type=int, default=1, help="render every nth episode"
     )
-    parser_eval.add_argument("-goal-xmin", type=float, default=-0.5)
-    parser_eval.add_argument("-goal-xmax", type=float, default=0.5)
-    parser_eval.set_defaults(func=eval_agent)
+    parser_eval.add_argument("-goal-xmin", type=float, default=-2.0)
+    parser_eval.add_argument("-goal-xmax", type=float, default=2.0)
+    parser_eval.add_argument(
+        "--save-gif", action="store_true", help="save animated gif"
+    )
+    parser_eval.add_argument("-seed", type=int, help="seed the rng.")
+
     args = parser.parse_args()
     if args.command == "train":
         train_agent(args)

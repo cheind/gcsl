@@ -2,3 +2,4 @@ numpy
 cloudpickle
 torch
 tqdm
+imageio

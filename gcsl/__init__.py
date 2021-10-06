@@ -8,7 +8,9 @@ import gym
 import numpy as np
 import torch
 import torch.distributions as D
+import torch.optim
 import torch.nn
+import torch.nn.functional as F
 
 State = Any
 Goal = State
@@ -58,11 +60,13 @@ def evaluate_policy(
     num_episodes: int,
     max_steps: int = 50,
     render_freq: bool = False,
-) -> Tuple[float, float]:
+    return_images: bool = False,
+) -> Union[Tuple[float, float], Tuple[float, float, List[np.ndarray]]]:
     """Evaluate the policy in the given environment.
     Returns average final goal metric and average episode lengths."""
     goal_metrics = []
     all_lengths = []
+    all_images = []
     for e in range(1, num_episodes + 1):
         goal = goal_sample_fn()
         render = e % render_freq == 0
@@ -71,14 +75,21 @@ def evaluate_policy(
             action = policy_fn(state, goal, t)
             state, _, done, _ = env.step(action)
             if render:
-                env.render(mode="human", goal=goal)
-                time.sleep(0.5 if done else 0.01)
+                if return_images:
+                    img = env.render(mode="rgb_array", goal=goal)
+                    all_images.append(img)
+                else:
+                    env.render(mode="human", goal=goal)
+                    time.sleep(0.5 if done else 0.01)
             if done:
                 break
         if hasattr(env, "goal_metric"):
             goal_metrics.append(env.goal_metric(state, goal))
         all_lengths.append(t + 1)
-    return np.mean(goal_metrics), np.mean(all_lengths)
+    if return_images:
+        return np.mean(goal_metrics), np.mean(all_lengths), all_images
+    else:
+        return np.mean(goal_metrics), np.mean(all_lengths)
 
 
 class ExperienceBuffer:
@@ -176,6 +187,24 @@ def to_tensor(
     actions = torch.tensor(actions).long()
     horizons = torch.tensor(horizons).int()
     return states, actions, goals, horizons
+
+
+def gcsl_step(
+    net: torch.nn.Module,
+    opt: torch.optim.Optimizer,
+    buffers: Union[ExperienceBuffer, Sequence[ExperienceBuffer]],
+    relabel_goal_fn: GoalRelabelFn,
+) -> torch.Tensor:
+    """Performs a single training step in the GCSL regime."""
+    s, a, g, h = to_tensor(sample_buffers(buffers, 512, relabel_goal_fn))
+    mask = h > 0  # Only consider samples which are not final states
+
+    opt.zero_grad()
+    logits = net(s[mask], g[mask], h[mask])
+    loss = F.cross_entropy(logits, a[mask])
+    loss.backward()
+    opt.step()
+    return loss
 
 
 def make_fc_layers(
