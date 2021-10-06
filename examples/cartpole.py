@@ -79,7 +79,7 @@ def relabel_goal(t0: gcsl.SAGHTuple, t1: gcsl.SAGHTuple) -> gcsl.Goal:
 
 
 def filter_trajectories(trajectories: List[gcsl.Trajectory]):
-    ft = [t for t in trajectories if abs(t[-1][0][2]) < 0.1 and len(t) > 20]
+    ft = [t for t in trajectories if abs(t[-1][0][2]) < 0.1]
     return ft
 
 
@@ -105,15 +105,14 @@ def main():
         env=env,
         goal_sample_fn=sample_goal,
         policy_fn=lambda s, g, h: env.action_space.sample(),
-        num_episodes=10,
-        max_steps=50,
+        num_episodes=50,
+        max_steps=200,
     )
     buffer.insert(trajectories)
 
     # Main GCSL loop
-    pbar = trange(1, 10000, unit="steps")
-    avg_rewards = 0.0
-    avg_elen = 0.0
+    pbar = trange(1, 100000, unit="steps")
+    postfix_dict = {"arew": 0.0, "alen": 0.0, "neweps": 0, "loss": 0.0}
     for e in pbar:
 
         # np.random.seed(123)
@@ -138,14 +137,16 @@ def main():
                     goal_sample_fn=sample_goal,
                     policy_fn=policy_fn,
                     num_episodes=100,
-                    max_steps=50,
+                    max_steps=200,
                 )
                 net.train()
-            buffer.insert(filter_trajectories(trajectories))
-
-        if e % 1000 == 0:
+            new_episodes = filter_trajectories(trajectories)
+            buffer.insert(new_episodes)
+            postfix_dict["neweps"] = len(new_episodes)
+            postfix_dict["loss"] = loss.item()
+        if e % 5000 == 0:
             net.eval()
-            avg_rewards, avg_elen = gcsl.evaluate_policy(
+            arew, alen = gcsl.evaluate_policy(
                 env,
                 goal_sample_fn=sample_goal_eval,
                 policy_fn=policy_fn,
@@ -153,13 +154,11 @@ def main():
                 max_steps=500,
                 render_freq=20,
             )
+            postfix_dict["alen"] = alen
+            postfix_dict["arew"] = arew
             net.train()
         if e % 100 == 0:
-            pbar.set_postfix(
-                loss=loss.item(),
-                avg_rew=f"{avg_rewards:.2f}",
-                avg_elen=f"{avg_elen:.2f}",
-            )
+            pbar.set_postfix(postfix_dict)
     env.close()
 
 
