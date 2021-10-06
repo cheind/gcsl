@@ -1,9 +1,9 @@
 from functools import partial
-from typing import List
 from pathlib import Path
+from typing import List, Tuple
 
-import imageio
 import gym
+import imageio
 import numpy as np
 import torch
 import torch.nn
@@ -17,7 +17,8 @@ class CartpoleGoalRenderWrapper(gym.Wrapper):
     """A goal-enriched wrapper for the classic Cartpole environment.
 
     Adds support for rendering goal positions as well as a metric
-    that computes the distances between state and goal.
+    that computes the distances between state and goal. Note, the metric
+    is only used for evaluation and plays no role in learning.
     """
 
     def __init__(self, env: gym.Env) -> None:
@@ -53,9 +54,10 @@ class CartpoleGoalRenderWrapper(gym.Wrapper):
 
 
 class CartpolePolicyNet(torch.nn.Module):
-    """The cartpole policy network outputting action-logits for state-goal inputs.
+    """The cartpole policy network predicting action-logits for
+    state-goal inputs.
 
-    Realized by a fully connected network with two hidden layers.
+    The architecture is a simple two hidden layer FC network.
     """
 
     def __init__(self):
@@ -71,13 +73,16 @@ class CartpolePolicyNet(torch.nn.Module):
         return logits
 
 
-def sample_goal(xrange=(-0.5, 0.5)):
+def sample_goal(xrange: Tuple[float, float] = (-0.5, 0.5)) -> gcsl.Goal:
+    """Sample a new goal. In the cartpole environment a goal is composed of a
+    cart-position and a pole angle."""
     pos = np.random.uniform(*xrange)
     pole_angle = 0.0
     return np.array([pos, pole_angle], dtype=np.float32)
 
 
 def relabel_goal(t0: gcsl.SAGHTuple, t1: gcsl.SAGHTuple) -> gcsl.Goal:
+    """Relabel the goal for `t0` using goal extracted from `t1`."""
     s, _, _, _ = t1
     pos = s[0]
     pole_angle = s[2]
@@ -85,11 +90,22 @@ def relabel_goal(t0: gcsl.SAGHTuple, t1: gcsl.SAGHTuple) -> gcsl.Goal:
 
 
 def filter_trajectories(trajectories: List[gcsl.Trajectory]):
+    """Filter trajectories according to length. In our case we simply
+    prefer longer sequences over shorter ones.
+
+    Note, being verify picky about which trajectories enter buffer may
+    lead to faster learning, but a) requires domain knowledge and b) may
+    result in less novel experiences, leading to overfitting of the
+    policy on the few experiences in the buffer.
+
+    In a sense, being selective here is like shaping the reward in RL.
+    """
     ft = [t for t in trajectories if np.random.rand() > 10 / len(t)]
     return ft
 
 
 def train_agent(args):
+    """Main training routine."""
     # Create env
     env = gym.make("CartPole-v1")
     env = CartpoleGoalRenderWrapper(env)
@@ -161,6 +177,7 @@ def train_agent(args):
 
 
 def eval_agent(args):
+    """Main routine for rendering results."""
 
     env = gym.make("CartPole-v1")
     env = CartpoleGoalRenderWrapper(env)
@@ -187,6 +204,7 @@ def eval_agent(args):
 
 
 def main():
+    """Entry point"""
     import argparse
 
     parser = argparse.ArgumentParser()
