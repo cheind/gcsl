@@ -5,7 +5,7 @@ This repository contains a minimal PyTorch-based implementation of the proposed 
 
 |<img src="./etc/cartpolenet_05000.gif"  width="80%">|<img src="./etc/cartpolenet_20000.gif"  width="80%">|
 |:----------:|:------------:|
-| 5.000 steps | 20.000 steps |
+| 5,000 steps | 20,000 steps |
 
 
 
