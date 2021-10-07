@@ -291,8 +291,8 @@ def main():
     parser_eval.add_argument(
         "-render-freq", type=int, default=1, help="render every nth episode"
     )
-    parser_eval.add_argument("-goal-xmin", type=float, default=-1.0)
-    parser_eval.add_argument("-goal-xmax", type=float, default=1.0)
+    parser_eval.add_argument("-goal-xmin", type=float, default=-1.5)
+    parser_eval.add_argument("-goal-xmax", type=float, default=1.5)
     parser_eval.add_argument(
         "--save-gif", action="store_true", help="save animated gif"
     )
