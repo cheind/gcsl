@@ -20,6 +20,7 @@ SAGHTuple = Tuple[State, Action, State, Horizon]
 Trajectory = List[SAGHTuple]
 PolicyFn = Callable[[State, Goal, Horizon], Action]
 GoalSampleFn = Callable[[], Goal]
+GoalUpdateFn = Callable[[Goal, Tuple[int, int]], Goal]
 GoalRelabelFn = Callable[[SAGHTuple, SAGHTuple], Goal]
 
 
@@ -55,15 +56,22 @@ def collect_trajectories(
 @torch.no_grad()
 def evaluate_policy(
     env: gym.Env,
-    goal_sample_fn: Callable,
+    goal_sample_fn: GoalSampleFn,
     policy_fn: PolicyFn,
     num_episodes: int,
     max_steps: int = 50,
     render_freq: bool = False,
     return_images: bool = False,
+    goal_dynamics_fn: GoalUpdateFn = None,
 ) -> Union[Tuple[float, float], Tuple[float, float, List[np.ndarray]]]:
     """Evaluate the policy in the given environment.
     Returns average final goal metric and average episode lengths."""
+
+    if goal_dynamics_fn is None:
+        goal_dynamics_fn = lambda g, _: g
+
+    print(max_steps)
+
     goal_metrics = []
     all_lengths = []
     all_images = []
@@ -72,6 +80,7 @@ def evaluate_policy(
         render = e % render_freq == 0
         state = env.reset()
         for t in range(max_steps):
+            goal = goal_dynamics_fn(goal, (t, max_steps))
             action = policy_fn(state, goal, t)
             state, _, done, _ = env.step(action)
             if render:

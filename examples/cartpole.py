@@ -39,6 +39,9 @@ class CartpoleGoalRenderWrapper(gym.Wrapper):
         super().__init__(env)
         self.goal_geom = None
         self.goal_transform = None
+        self.env._max_episode_steps = (
+            1500  # otherwise we might be finished at 200/500 steps.
+        )
 
     def goal_metric(self, state: gcsl.State, goal: gcsl.Goal) -> float:
         """Measures the absolute deviation of state to goal."""
@@ -200,10 +203,25 @@ def eval_agent(args):
     eval_policy_fn = gcsl.make_policy_fn(net, greedy=True)
     if args.seed is not None:
         np.random.seed(args.seed)
+    if args.dynamic_goal:
+        # In case the goal is dynamic, we linearly interpolate the goal
+        # position between xmin, xmax over max-steps
+        goal_sample_fn = lambda: np.array([args.goal_xmin, 0.0], dtype=np.float32)
+
+        def goal_dyn_fn(g, tdata):
+            t, tmax = tdata
+            pos = args.goal_xmin + (t / tmax) * (args.goal_xmax - args.goal_xmin)
+            g[0] = pos
+            return g
+
+    else:
+        goal_sample_fn = partial(sample_goal, xrange=(args.goal_xmin, args.goal_xmax))
+        goal_dyn_fn = None
 
     result = gcsl.evaluate_policy(
         env,
-        goal_sample_fn=partial(sample_goal, xrange=(args.goal_xmin, args.goal_xmax)),
+        goal_sample_fn=goal_sample_fn,
+        goal_dynamics_fn=goal_dyn_fn,
         policy_fn=eval_policy_fn,
         num_episodes=args.num_episodes,
         max_steps=args.max_steps,
@@ -273,12 +291,17 @@ def main():
     parser_eval.add_argument(
         "-render-freq", type=int, default=1, help="render every nth episode"
     )
-    parser_eval.add_argument("-goal-xmin", type=float, default=-2.0)
-    parser_eval.add_argument("-goal-xmax", type=float, default=2.0)
+    parser_eval.add_argument("-goal-xmin", type=float, default=-1.0)
+    parser_eval.add_argument("-goal-xmax", type=float, default=1.0)
     parser_eval.add_argument(
         "--save-gif", action="store_true", help="save animated gif"
     )
     parser_eval.add_argument("-seed", type=int, help="seed the rng.")
+    parser_eval.add_argument(
+        "--dynamic-goal",
+        action="store_true",
+        help="Slowly move the goal during episode between goal-xmin and goal-xmax.",
+    )
 
     args = parser.parse_args()
     if args.command == "train":
