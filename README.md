@@ -21,7 +21,7 @@ python -m examples.cartpole eval ./tmp/cartpolenet_20000.pth
 See command line options for tuning.
 
 ## Dynamic environment experiments
-Since, we condition on goals, nothing stops us from changing the goals over time. The following animation shows the agent chasing a dynamic goal.
+Since we condition our policy on goals, nothing stops us from changing the goals over time. The following animation shows the agent chasing a dynamic goal.
 
 <div align="center">
 <img src="./etc/cartpolenet_20000_dynamic.gif"  width="40%">
