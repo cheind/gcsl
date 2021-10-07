@@ -1,3 +1,17 @@
+"""This module contains code to train/eval GCSL on a modified cartpole environment.
+
+The goal of the modified cartpole environment ist to maintain an upright pole and
+reach a specific cart location. A goal, g, is described by a tuple
+    g = (pos,pole_angle_rad)
+In training, we sample goal cart locations uniformly across the range [-1.5, 1.5). The 
+target pole angle is always zero.
+
+Training in this environment is tricky, since the ends episodes when the pole angle is
+slightly off from zero. This prevents the agent from gaining experiences far from its
+starting location that is always around the center of the world.
+"""
+
+
 from functools import partial
 from pathlib import Path
 from typing import List, Tuple
