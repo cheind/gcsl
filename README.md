@@ -1,5 +1,5 @@
 # Vanilla GCSL
-This repository contains a vanilla implementation of *"Learning to Reach Goals via Iterated Supervised Learning"* proposed by Dibya Gosh et al. in 2019. In short, their method uses an imitation learning objective to progressively refine a goal-conditioned policy by reframing past experiences as future goals.
+This repository contains a vanilla implementation of *"Learning to Reach Goals via Iterated Supervised Learning"* proposed by Dibya Gosh et al. in 2019. In short, their method uses an imitation learning objective to progressively refine a goal-conditioned policy by reframing past experiences as future goals. In a sense, learning is self-supervised without the need for human demonstrations or reward functions.
 
 This repository contains a minimal PyTorch-based implementation of the proposed method and applies it to an adapted Cartpole environment. In particular, the goal of the adapted Cartpole environment is to: a) maintain an upright pole (zero pole angle) and to reach a particular cart position (shown in red below). A qualitative performance comparison of two agents at different training times is shown below.
 
