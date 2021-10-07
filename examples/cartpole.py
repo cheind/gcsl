@@ -133,13 +133,13 @@ def train_agent(args):
     buffer.insert(trajectories)
 
     # Main GCSL loop
-    pbar = trange(1, args.num_steps + 1, unit="steps")
+    pbar = trange(1, args.num_gcsl_steps + 1, unit="steps")
     postfix_dict = {"agm": 0.0, "alen": 0.0, "neweps": 0, "loss": 0.0}
     for e in pbar:
         # Perform a single GCSL training step
         loss = gcsl.gcsl_step(net, opt, buffer, relabel_goal)
 
-        if e % 100 == 0:
+        if e % args.collect_freq == 0:
             # Every now and then, sample new experiences
             with torch.no_grad():
                 net.eval()
@@ -147,8 +147,8 @@ def train_agent(args):
                     env,
                     goal_sample_fn=sample_goal,
                     policy_fn=collect_policy_fn,
-                    num_episodes=100,
-                    max_steps=400,
+                    num_episodes=args.num_eps_collect,
+                    max_steps=args.max_eps_steps,
                 )
                 net.train()
             # Optionally filter the trajectories
@@ -156,16 +156,16 @@ def train_agent(args):
             buffer.insert(new_episodes)
             postfix_dict["neweps"] = len(new_episodes)
             postfix_dict["loss"] = loss.item()
-        if e % 5000 == 0:
+        if e % args.eval_freq == 0:
             # Evaluate the policy and save model
             net.eval()
             agm, alen = gcsl.evaluate_policy(
                 env,
                 goal_sample_fn=sample_goal,
                 policy_fn=eval_policy_fn,
-                num_episodes=20,
-                max_steps=500,
-                render_freq=20,
+                num_episodes=args.num_eps_eval,
+                max_steps=args.max_eps_steps,
+                render_freq=args.num_eps_eval,  # shows only last
             )
             postfix_dict["alen"] = alen
             postfix_dict["agm"] = agm
@@ -212,12 +212,39 @@ def main():
 
     parser_train = subparsers.add_parser("train", help="train cartpole agent")
     parser_train.set_defaults(func=train_agent)
-    parser_train.add_argument("-lr", type=float, default=1e-4, help="learning rate")
+    parser_train.add_argument("-lr", type=float, default=1e-3, help="learning rate")
     parser_train.add_argument(
-        "-num_steps", type=int, default=int(1e5), help="number of GCSL steps"
+        "-num-gcsl-steps", type=int, default=int(1e5), help="number of GCSL steps"
+    )
+    parser_train.add_argument(
+        "-max-eps-steps",
+        type=int,
+        default=500,
+        help="maximum number of episode steps in eval and collection",
     )
     parser_train.add_argument(
         "-buffer-size", type=int, default=int(1e6), help="capacity of buffer"
+    )
+    parser_train.add_argument(
+        "-collect-freq",
+        type=int,
+        default=100,
+        help="collect new experiences every nth step",
+    )
+    parser_train.add_argument(
+        "-num-eps-collect",
+        type=int,
+        default=100,
+        help="number of episodes per evaluation step",
+    )
+    parser_train.add_argument(
+        "-num-eps-eval",
+        type=int,
+        default=50,
+        help="number of episodes per collection step",
+    )
+    parser_train.add_argument(
+        "-eval-freq", type=int, default=5000, help="eval every nth step"
     )
 
     parser_eval = subparsers.add_parser("eval", help="eval cartpole agent")
