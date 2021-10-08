@@ -90,7 +90,7 @@ class CartpolePolicyNet(torch.nn.Module):
         return logits
 
 
-def sample_goal(xrange: Tuple[float, float] = (-0.5, 0.5)) -> gcsl.Goal:
+def sample_goal(xrange: Tuple[float, float] = (-1.5, 1.5)) -> gcsl.Goal:
     """Sample a new goal. In the cartpole environment a goal is composed of a
     cart-position and a pole angle."""
     pos = np.random.uniform(*xrange)
@@ -142,7 +142,7 @@ def train_agent(args):
     # Collected and store experiences from a random policy
     trajectories = gcsl.collect_trajectories(
         env=env,
-        goal_sample_fn=partial(sample_goal, xrange=(-1.5, 1.5)),
+        goal_sample_fn=sample_goal,
         policy_fn=lambda s, g, h: env.action_space.sample(),
         num_episodes=50,
         max_steps=400,
