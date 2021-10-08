@@ -7,13 +7,14 @@ In short, the paper proposes a learning framework to progressively refine a goal
 **Relabeling details** 
 Let `(s_t,a_t,g)` be a state-action-goal tuple in an experienced trajectory and `(s_(t+r),a_(t+r),g)` any future state reached within the same trajectory. While the agent might have failed to reach `g`, we may construct the relabeled training objective `(s_t,a_t,s_(t+r))`, since `s_(t+r)` was actually reached via `s_t,a_t,s_(t+1),a_(t+1)...s_(t+r)`. 
 
-**Content** This repository contains a vanilla, easy to follow, PyTorch-based implementation of the proposed method and applies it to an adapted Cartpole environment. In particular, the goal of the adapted Cartpole environment is to: a) maintain an upright pole (zero pole angle) and to reach a particular cart position (shown in red). A qualitative performance comparison of two agents at different training times is shown below. Training started with a random policy, no expert demonstrations were used.
+## About this repository
+This repository contains a vanilla, easy-to-understand  PyTorch-based implementation of the proposed method and applies it to an customized Cartpole environment. In particular, the goal of the adapted Cartpole environment is to: a) maintain an upright pole (zero pole angle) and to reach a particular cart position (shown in red). A qualitative performance comparison of two agents at different training times is shown below. Training started with a random policy, no expert demonstrations were used.
 
 |<img src="./etc/cartpolenet_01000.gif"  width="80%">|<img src="./etc/cartpolenet_05000.gif"  width="80%">|<img src="./etc/cartpolenet_20000.gif"  width="80%">|
 |:----------:|:----------:|:------------:|
 | 1,000 steps | 5,000 steps | 20,000 steps |
 
-## Dynamic environment experiments
+### Dynamic environment experiments
 Since we condition our policy on goals, nothing stops us from changing the goals over time, i.e `g -> g(t)`. The following animation shows the agent successfully chasing such dynamic goal.
 
 <div align="center">
