@@ -182,7 +182,7 @@ def train_agent(args):
                 policy_fn=eval_policy_fn,
                 num_episodes=args.num_eps_eval,
                 max_steps=args.max_eps_steps,
-                render_freq=args.num_eps_eval,  # shows only last
+                render_freq=args.render_freq,  # shows only last
             )
             postfix_dict["alen"] = alen
             postfix_dict["agm"] = agm
@@ -278,6 +278,9 @@ def main():
     )
     parser_train.add_argument(
         "-eval-freq", type=int, default=5000, help="eval every nth step"
+    )
+    parser_train.add_argument(
+        "-render-freq", type=int, default=50, help="render every nth episode of eval"
     )
 
     # Parser for evaluation
