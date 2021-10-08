@@ -4,7 +4,7 @@ python:
 cache:
   pip: true
 install:
-- pip install https://github.com/cheind/gcsl.git[dev]
+- pip install https://github.com/cheind/gcsl.git#egg=gcsl[dev]
 script:
 - python -m gcsl.examples.cartpole train -num-gcsl-steps 100 -eval-freq 100 -num-eps-eval 1
 - python -m gcsl.examples.cartpole eval -num-episodes 1 -render-freq 100 .\tmp\cartpolenet_00100.pth
