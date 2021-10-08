@@ -23,6 +23,10 @@ Since we condition our policy on goals, nothing stops us from changing the goals
 <img src="./etc/cartpolenet_20000_dynamic.gif"  width="40%">
 </div>
 
+### Parallel environments
+
+The branch `parallel-ray-envs` hosts the same cartpole example but training is speed-up using [ray](https://www.ray.io/) primitives. In particular, environments rollouts are parallelized and trajectory results are incorporated on the fly. The current version is roughly **35% faster** than the the sequential one.
+
 ## Run the code
 Install
 ```
