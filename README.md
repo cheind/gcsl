@@ -15,7 +15,7 @@ This repository contains a vanilla, easy-to-understand  PyTorch-based implementa
 | 1,000 steps | 5,000 steps | 20,000 steps |
 
 ### Dynamic environment experiments
-Since we condition our policy on goals, nothing stops us from changing the goals over time, i.e `g -> g(t)`. The following animation shows the agent successfully chasing such dynamic goal.
+Since we condition our policy on goals, nothing stops us from changing the goals over time, i.e `g -> g(t)`. The following animation shows the agent successfully chasing a moving goal.
 
 <div align="center">
 <img src="./etc/cartpolenet_20000_dynamic.gif"  width="40%">
