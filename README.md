@@ -1,9 +1,10 @@
 # Vanilla GCSL
 This repository contains a vanilla implementation of *"Learning to Reach Goals via Iterated Supervised Learning"* proposed by Dibya Gosh et al. in 2019. 
 
-In short, the paper proposes a learning framework to progressively refine a goal-conditioned imitation policy `pi(a_t|s_t,g)` based on relabeling past experiences as new training goals. The learning approach is self-supervised and does not necessarily rely on expert demonstrations or reward functions.
+In short, the paper proposes a learning framework to progressively refine a goal-conditioned imitation policy `pi_k(a_t|s_t,g)` based on relabeling past experiences as new training goals. In particular, the approach iteratively performs the following steps: a) collect experiences using the current policy `pi_k` and a sampled goal `g` to collect experiences, b) relabel trajectories such that reached states become surrogate goals (details below) and c) update the policy `pi_(k+1)` using behavioral cloning. The approach is self-supervised and does not necessarily rely on expert demonstrations or reward functions. The paper shows, that training for these surrogate tuples actually leads to desirable goal-reaching behavior.
 
-Let `(s_t,a_t,g)` be a state-action-goal tuple in an experienced trajectory and `(s_(t+r),a_(t+r),g)` any future reached state of the same trajectory. While the agent might have failed to reach `g`, we may construct the relabeled training objective `(s_t,a_t,s_(t+r))`, since `s_(t+r)` was actually reached via `s_t,a_t,s_(t+1),a_(t+1)...s_(t+r)`. The paper shows, that training for these surrogate tuples actually leads to desirable goal-reaching behavior.
+**Relabeling details** 
+Let `(s_t,a_t,g)` be a state-action-goal tuple in an experienced trajectory and `(s_(t+r),a_(t+r),g)` any future reached state of the same trajectory. While the agent might have failed to reach `g`, we may construct the relabeled training objective `(s_t,a_t,s_(t+r))`, since `s_(t+r)` was actually reached via `s_t,a_t,s_(t+1),a_(t+1)...s_(t+r)`. 
 
 This repository contains a vanilla PyTorch-based implementation of the proposed method and applies it to an adapted Cartpole environment. In particular, the goal of the adapted Cartpole environment is to: a) maintain an upright pole (zero pole angle) and to reach a particular cart position (shown in red). A qualitative performance comparison of two agents at different training times is shown below. Training started with a random policy, no expert demonstrations were used.
 
