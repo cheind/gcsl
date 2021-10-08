@@ -21,13 +21,13 @@ Since we condition our policy on goals, nothing stops us from changing the goals
 ## Run the code
 Clone this repository, install the requirements and run
 ```
-python -m examples.cartpole train
+python -m gcsl.examples.cartpole train
 ```
 which will save models to `./tmp/cartpoleagent_xxxxx.pth`. 
 
 To evaluate, run
 ```
-python -m examples.cartpole eval ./tmp/cartpolenet_20000.pth
+python -m gcsl.examples.cartpole eval ./tmp/cartpolenet_20000.pth
 ```
 See command line options for tuning. The above animation for the dynamic goal was created via the following command
 ```

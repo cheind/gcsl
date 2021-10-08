@@ -242,6 +242,7 @@ def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    # Parser for training
     parser_train = subparsers.add_parser("train", help="train cartpole agent")
     parser_train.set_defaults(func=train_agent)
     parser_train.add_argument("-lr", type=float, default=1e-3, help="learning rate")
@@ -279,6 +280,7 @@ def main():
         "-eval-freq", type=int, default=5000, help="eval every nth step"
     )
 
+    # Parser for evaluation
     parser_eval = subparsers.add_parser("eval", help="eval cartpole agent")
     parser_eval.set_defaults(func=eval_agent)
     parser_eval.add_argument("weights", type=Path, help="agent policy weights")
