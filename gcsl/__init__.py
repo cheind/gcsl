@@ -70,8 +70,6 @@ def evaluate_policy(
     if goal_dynamics_fn is None:
         goal_dynamics_fn = lambda g, _: g
 
-    print(max_steps)
-
     goal_metrics = []
     all_lengths = []
     all_images = []
