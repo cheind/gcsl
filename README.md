@@ -46,9 +46,12 @@ python -m examples.cartpole eval ^
 
 ## References
 ```bibtex
-@article{ghosh2019learning,
-  title={Learning to reach goals without reinforcement learning},
-  author={Ghosh, Dibya and Gupta, Abhishek and Fu, Justin and Reddy, Ashwin and Devin, Coline and Eysenbach, Benjamin and Levine, Sergey},
-  year={2019}
+@inproceedings{
+ghosh2021learning,
+title={Learning to Reach Goals via Iterated Supervised Learning},
+author={Dibya Ghosh and Abhishek Gupta and Ashwin Reddy and Justin Fu and Coline Manon Devin and Benjamin Eysenbach and Sergey Levine},
+booktitle={International Conference on Learning Representations},
+year={2021},
+url={https://openreview.net/forum?id=rALA0Xo6yNJ}
 }
 ```
