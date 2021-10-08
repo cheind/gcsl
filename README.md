@@ -7,6 +7,8 @@ In short, the paper proposes a learning framework to progressively refine a goal
 **Relabeling details** 
 Let `(s_t,a_t,g)` be a state-action-goal tuple from an experienced trajectory and `(s_(t+r),a_(t+r),g)` any future state reached within the same trajectory. While the agent might have failed to reach `g`, we may construct the relabeled training objective `(s_t,a_t,s_(t+r))`, since `s_(t+r)` was actually reached via `s_t,a_t,s_(t+1),a_(t+1)...s_(t+r)`. 
 
+**Discussion** Note, by definition, an optimal policy is one that reaches it goals. In that sense, past experiences with relabeling applied are optimal under any policy. Hence, old data can be reused at all times to improve the current policy. A potential drawback of this optimality definition is the absence of an *efficient* goal reaching behavior notion. However, the paper (and subsequent experiments) show experimentally that the resulting behavioral strategies are fairly goal-directed.
+
 ## About this repository
 This repository contains a vanilla, easy-to-understand  PyTorch-based implementation of the proposed method and applies it to an customized Cartpole environment. In particular, the goal of the adapted Cartpole environment is to: a) maintain an upright pole (zero pole angle) and to reach a particular cart position (shown in red). A qualitative performance comparison of two agents at different training times is shown below. Training started with a random policy, no expert demonstrations were used.
 
