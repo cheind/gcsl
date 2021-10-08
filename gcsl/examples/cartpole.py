@@ -15,8 +15,10 @@ starting location that is always around the center of the world.
 from functools import partial
 from pathlib import Path
 from typing import List, Tuple
+import itertools
 
 import gym
+import ray
 import imageio
 import numpy as np
 import torch
@@ -90,7 +92,7 @@ class CartpolePolicyNet(torch.nn.Module):
         return logits
 
 
-def sample_goal(xrange: Tuple[float, float] = (-0.5, 0.5)) -> gcsl.Goal:
+def sample_goal(xrange: Tuple[float, float] = (-1.5, 1.5)) -> gcsl.Goal:
     """Sample a new goal. In the cartpole environment a goal is composed of a
     cart-position and a pole angle."""
     pos = np.random.uniform(*xrange)
@@ -121,7 +123,39 @@ def filter_trajectories(trajectories: List[gcsl.Trajectory]):
     return ft
 
 
+@ray.remote
+class RolloutHelper:
+    def __init__(self):
+        env = gym.make("CartPole-v1")
+        self.env = CartpoleGoalRenderWrapper(env)
+        self.net = CartpolePolicyNet()
+        self.policy_fn = gcsl.make_policy_fn(self.net, greedy=False, tscaling=0.1)
+        self.goal_sample_fn = sample_goal
+
+    def collect_trajectories(
+        self, state_dict: dict, num_episodes: int, max_steps: int
+    ) -> List[gcsl.Trajectory]:
+        self.net.load_state_dict(state_dict)
+        with torch.no_grad():
+            self.net.eval()
+            trajs = gcsl.collect_trajectories(
+                self.env,
+                self.goal_sample_fn,
+                self.policy_fn,
+                num_episodes=num_episodes,
+                max_steps=max_steps,
+            )
+            trajs = filter_trajectories(trajs)
+            self.net.train()
+            return trajs
+
+
 def train_agent(args):
+    ray.init()
+    rollout_envs = [
+        RolloutHelper.remote() for _ in range(int(ray.available_resources()["CPU"]))
+    ]
+
     """Main training routine."""
     # Create env
     env = gym.make("CartPole-v1")
@@ -133,7 +167,6 @@ def train_agent(args):
 
     # Create a policy-fn invoking our net. This will be called
     # during data collection and evaluation, but not used in training.
-    collect_policy_fn = gcsl.make_policy_fn(net, greedy=False, tscaling=0.1)
     eval_policy_fn = gcsl.make_policy_fn(net, greedy=True)
 
     # Create a buffer for experiences
@@ -152,24 +185,32 @@ def train_agent(args):
     # Main GCSL loop
     pbar = trange(1, args.num_gcsl_steps + 1, unit="steps")
     postfix_dict = {"agm": 0.0, "alen": 0.0, "neweps": 0, "loss": 0.0}
+    #    new_episode_ids = []
     for e in pbar:
         # Perform a single GCSL training step
         loss = gcsl.gcsl_step(net, opt, buffer, relabel_goal)
+        # ready, not_ready = ray.wait(new_episode_ids)
+        # for
 
         if e % args.collect_freq == 0:
             # Every now and then, sample new experiences
-            with torch.no_grad():
-                net.eval()
-                trajectories = gcsl.collect_trajectories(
-                    env,
-                    goal_sample_fn=sample_goal,
-                    policy_fn=collect_policy_fn,
-                    num_episodes=args.num_eps_collect,
-                    max_steps=args.max_eps_steps,
+            # First, store current model waits
+            state_id = ray.put(net.state_dict())
+            # Distribute work across rollout helpers. Note,
+            new_episodes = list(
+                itertools.chain(
+                    *ray.get(
+                        [
+                            re.collect_trajectories.remote(
+                                state_id,
+                                args.num_eps_collect // len(rollout_envs),
+                                args.max_eps_steps,
+                            )
+                            for re in rollout_envs
+                        ]
+                    )
                 )
-                net.train()
-            # Optionally filter the trajectories
-            new_episodes = filter_trajectories(trajectories)
+            )
             buffer.insert(new_episodes)
             postfix_dict["neweps"] = len(new_episodes)
             postfix_dict["loss"] = loss.item()

@@ -5,3 +5,4 @@ tqdm
 imageio
 gym
 pyglet
+ray
