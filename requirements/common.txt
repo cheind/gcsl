@@ -4,3 +4,4 @@ torch
 tqdm
 imageio
 gym
+pyglet
