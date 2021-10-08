@@ -41,7 +41,6 @@ python -m examples.cartpole eval ^
  -goal-xmax "1" ^
  --dynamic-goal ^
  --save-gif
-
 ```
 
 
