@@ -3,3 +3,4 @@ cloudpickle
 torch
 tqdm
 imageio
+gym
