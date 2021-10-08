@@ -21,13 +21,15 @@ Since we condition our policy on goals, nothing stops us from changing the goals
 </div>
 
 ## Run the code
-Clone this repository, install the requirements and run
+Install
+```
+pip install git+https://github.com/cheind/gcsl.git
+```
+and start training via
 ```
 python -m gcsl.examples.cartpole train
 ```
-which will save models to `./tmp/cartpoleagent_xxxxx.pth`. 
-
-To evaluate, run
+which will save models to `./tmp/cartpoleagent_xxxxx.pth`. To evaluate, run
 ```
 python -m gcsl.examples.cartpole eval ./tmp/cartpolenet_20000.pth
 ```
