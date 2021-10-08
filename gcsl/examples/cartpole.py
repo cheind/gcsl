@@ -185,34 +185,33 @@ def train_agent(args):
     # Main GCSL loop
     pbar = trange(1, args.num_gcsl_steps + 1, unit="steps")
     postfix_dict = {"agm": 0.0, "alen": 0.0, "neweps": 0, "loss": 0.0}
-    #    new_episode_ids = []
+    pending_episode_ids = []
     for e in pbar:
         # Perform a single GCSL training step
         loss = gcsl.gcsl_step(net, opt, buffer, relabel_goal)
-        # ready, not_ready = ray.wait(new_episode_ids)
-        # for
+
+        # Update any pending results from rollout workers
+        ready, not_ready = ray.wait(pending_episode_ids, timeout=0.01)
+        if len(ready) > 0:
+            ready_trajs = list(itertools.chain(*ray.get(ready)))
+            buffer.insert(ready_trajs)
+            postfix_dict["neweps"] = len(ready_trajs)
+        pending_episode_ids = not_ready
+        postfix_dict["pending"] = len(pending_episode_ids)
 
         if e % args.collect_freq == 0:
             # Every now and then, sample new experiences
-            # First, store current model waits
+            # First, store current model waits (blocking)
             state_id = ray.put(net.state_dict())
-            # Distribute work across rollout helpers. Note,
-            new_episodes = list(
-                itertools.chain(
-                    *ray.get(
-                        [
-                            re.collect_trajectories.remote(
-                                state_id,
-                                args.num_eps_collect // len(rollout_envs),
-                                args.max_eps_steps,
-                            )
-                            for re in rollout_envs
-                        ]
-                    )
+            # Distribute work across rollout helpers (not blocking)
+            pending_episode_ids += [
+                re.collect_trajectories.remote(
+                    state_id,
+                    args.num_eps_collect // len(rollout_envs),
+                    args.max_eps_steps,
                 )
-            )
-            buffer.insert(new_episodes)
-            postfix_dict["neweps"] = len(new_episodes)
+                for re in rollout_envs
+            ]
             postfix_dict["loss"] = loss.item()
         if e % args.eval_freq == 0:
             # Evaluate the policy and save model
