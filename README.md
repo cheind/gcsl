@@ -1,3 +1,4 @@
+[![Build Status](https://app.travis-ci.com/cheind/gcsl.svg?branch=main)](https://app.travis-ci.com/cheind/gcsl)
 # Vanilla GCSL
 This repository contains a vanilla implementation of *"Learning to Reach Goals via Iterated Supervised Learning"* proposed by Dibya Gosh et al. in 2019. 
 
