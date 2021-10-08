@@ -25,7 +25,7 @@ Since we condition our policy on goals, nothing stops us from changing the goals
 
 ### Parallel environments
 
-The branch `parallel-ray-envs` hosts the same cartpole example but training is speed-up via [ray](https://www.ray.io/) primitives. In particular, environments rollouts are parallelized and trajectory results are incorporated on the fly. The current version is roughly **35% faster** than the the sequential one. Its currently not merged with main, since it requires a bit more code to understand.
+The branch `parallel-ray-envs` hosts the same cartpole example but training is speed-up via [ray](https://www.ray.io/) primitives. In particular, environments rollouts are parallelized and trajectory results are incorporated on the fly. The parallel version is roughly **35% faster** than the the sequential one. Its currently not merged with main, since it requires a bit more code to digest.
 
 ## Run the code
 Install
