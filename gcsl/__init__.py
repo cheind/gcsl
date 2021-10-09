@@ -145,7 +145,7 @@ class ExperienceBuffer:
         if h > 0:
             # If not last element of trajectory, we can sample
             # a new horizon, which defines the target tuple.
-            h = int(np.random.randint(1, min(h + 1, max_horizon)))
+            h = int(np.random.randint(1, min(h, max_horizon) + 1))
         t1 = self.memory[idx + h]
         # Note, h(t0) >= h(t1)
         g = goal_relabel_fn(t0, t1)
@@ -202,9 +202,14 @@ def gcsl_step(
     buffers: Union[ExperienceBuffer, Sequence[ExperienceBuffer]],
     relabel_goal_fn: GoalRelabelFn,
     batch_size: int = 512,
+    max_relabel_horizon: int = None,
 ) -> torch.Tensor:
     """Performs a single training step in the GCSL regime."""
-    s, a, g, h = to_tensor(sample_buffers(buffers, batch_size, relabel_goal_fn))
+    s, a, g, h = to_tensor(
+        sample_buffers(
+            buffers, batch_size, relabel_goal_fn, max_horizon=max_relabel_horizon
+        )
+    )
     mask = h > 0  # Only consider samples which are not final states
 
     opt.zero_grad()

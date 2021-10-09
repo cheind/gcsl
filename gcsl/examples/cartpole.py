@@ -76,13 +76,13 @@ class CartpolePolicyNet(torch.nn.Module):
     """The cartpole policy network predicting action-logits for
     state-goal inputs.
 
-    The architecture is a simple two hidden layer FC network.
+    The architecture is a three small hidden layer FC network.
     """
 
     def __init__(self):
         super().__init__()
         self.logits = gcsl.make_fc_layers(
-            6, [300, "A", "D", 400, "A", "D", 2], dropout=0.2
+            6, [64, "A", 128, "A", "D", 256, "A", 2], dropout=0.1
         )
 
     def forward(self, s, g, h):
@@ -188,7 +188,14 @@ def train_agent(args):
     pending_episode_ids = []
     for e in pbar:
         # Perform a single GCSL training step
-        loss = gcsl.gcsl_step(net, opt, buffer, relabel_goal)
+        loss = gcsl.gcsl_step(
+            net,
+            opt,
+            buffer,
+            relabel_goal,
+            batch_size=args.batch_size,
+            max_relabel_horizon=args.max_relabel_horizon,
+        )
         postfix_dict["loss"] = loss.item()
 
         # Update any pending results from rollout workers
@@ -287,7 +294,7 @@ def main():
     # Parser for training
     parser_train = subparsers.add_parser("train", help="train cartpole agent")
     parser_train.set_defaults(func=train_agent)
-    parser_train.add_argument("-lr", type=float, default=1e-3, help="learning rate")
+    parser_train.add_argument("-lr", type=float, default=5e-4, help="learning rate")
     parser_train.add_argument(
         "-num-gcsl-steps", type=int, default=int(1e5), help="number of GCSL steps"
     )
@@ -323,6 +330,12 @@ def main():
     )
     parser_train.add_argument(
         "-render-freq", type=int, default=50, help="render every nth episode of eval"
+    )
+    parser_train.add_argument(
+        "-batch-size", type=int, default=512, help="batch-size per gcsl step"
+    )
+    parser_train.add_argument(
+        "-max-relabel-horizon", type=int, default=None, help="maximum relabel horizon"
     )
 
     # Parser for evaluation
