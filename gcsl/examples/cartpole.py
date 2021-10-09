@@ -178,7 +178,7 @@ def train_agent(args):
         goal_sample_fn=partial(sample_goal, xrange=(-1.5, 1.5)),
         policy_fn=lambda s, g, h: env.action_space.sample(),
         num_episodes=50,
-        max_steps=400,
+        max_steps=args.max_eps_steps,
     )
     buffer.insert(trajectories)
 
@@ -189,6 +189,7 @@ def train_agent(args):
     for e in pbar:
         # Perform a single GCSL training step
         loss = gcsl.gcsl_step(net, opt, buffer, relabel_goal)
+        postfix_dict["loss"] = loss.item()
 
         # Update any pending results from rollout workers
         ready, not_ready = ray.wait(pending_episode_ids, timeout=0.01)
@@ -212,7 +213,8 @@ def train_agent(args):
                 )
                 for re in rollout_envs
             ]
-            postfix_dict["loss"] = loss.item()
+            del state_id
+
         if e % args.eval_freq == 0:
             # Evaluate the policy and save model
             net.eval()
