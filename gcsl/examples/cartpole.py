@@ -101,7 +101,7 @@ def sample_goal(xrange: Tuple[float, float] = (-1.5, 1.5)) -> gcsl.Goal:
 
 
 def relabel_goal(t0: gcsl.SAGHTuple, t1: gcsl.SAGHTuple) -> gcsl.Goal:
-    """Relabel the goal for `t0` using goal extracted from `t1`."""
+    """Relabel the goal for `t0` from state of `t1`."""
     s, _, _, _ = t1
     pos = s[0]
     pole_angle = s[2]
