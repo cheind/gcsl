@@ -201,9 +201,10 @@ def gcsl_step(
     opt: torch.optim.Optimizer,
     buffers: Union[ExperienceBuffer, Sequence[ExperienceBuffer]],
     relabel_goal_fn: GoalRelabelFn,
+    batch_size: int = 512,
 ) -> torch.Tensor:
     """Performs a single training step in the GCSL regime."""
-    s, a, g, h = to_tensor(sample_buffers(buffers, 512, relabel_goal_fn))
+    s, a, g, h = to_tensor(sample_buffers(buffers, batch_size, relabel_goal_fn))
     mask = h > 0  # Only consider samples which are not final states
 
     opt.zero_grad()
