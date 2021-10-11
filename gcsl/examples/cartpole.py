@@ -106,6 +106,22 @@ def relabel_goal(t0: gcsl.SAGHTuple, t1: gcsl.SAGHTuple) -> gcsl.Goal:
     return np.array([pos, pole_angle], dtype=np.float32)
 
 
+def sample_goal_coop(xrange: Tuple[float, float] = (-1.5, 1.5)) -> gcsl.Goal:
+    """Sample a new goal. In the coop cartpole environment a goal is composed of a
+    target cart-velocity and a pole angle."""
+    cart_vel = np.random.uniform(-5.0, 5.0)
+    pole_angle = 0.0
+    return np.array([cart_vel, pole_angle], dtype=np.float32)
+
+
+def relabel_goal_coop(t0: gcsl.SAGHTuple, t1: gcsl.SAGHTuple) -> gcsl.Goal:
+    """Relabel the goal for `t0` from state of `t1`."""
+    s, _, _, _ = t1
+    cart_vel = np.clip(s[1], -5.0, 5.0)
+    pole_angle = s[2]
+    return np.array([cart_vel, pole_angle], dtype=np.float32)
+
+
 def filter_trajectories(trajectories: List[gcsl.Trajectory]):
     """Filter trajectories according to length. In our case we simply
     prefer longer sequences over shorter ones.
@@ -135,6 +151,8 @@ def train_agent(args):
     # during data collection and evaluation, but not used in training.
     collect_policy_fn = gcsl.make_policy_fn(net, greedy=False, tscaling=0.1)
     eval_policy_fn = gcsl.make_policy_fn(net, greedy=True)
+    relabel_fn = relabel_goal_coop if args.coop else relabel_goal
+    sample_goal_fn = sample_goal_coop if args.coop else sample_goal
 
     # Create a buffer for experiences
     buffer = gcsl.ExperienceBuffer(args.buffer_size)
@@ -142,10 +160,10 @@ def train_agent(args):
     # Collected and store experiences from a random policy
     trajectories = gcsl.collect_trajectories(
         env=env,
-        goal_sample_fn=sample_goal,
+        goal_sample_fn=sample_goal_fn,
         policy_fn=lambda s, g, h: env.action_space.sample(),
         num_episodes=50,
-        max_steps=400,
+        max_steps=args.max_eps_steps,
     )
     buffer.insert(trajectories)
 
@@ -154,7 +172,7 @@ def train_agent(args):
     postfix_dict = {"agm": 0.0, "alen": 0.0, "neweps": 0, "loss": 0.0}
     for e in pbar:
         # Perform a single GCSL training step
-        loss = gcsl.gcsl_step(net, opt, buffer, relabel_goal)
+        loss = gcsl.gcsl_step(net, opt, buffer, relabel_fn)
 
         if e % args.collect_freq == 0:
             # Every now and then, sample new experiences
@@ -162,7 +180,7 @@ def train_agent(args):
                 net.eval()
                 trajectories = gcsl.collect_trajectories(
                     env,
-                    goal_sample_fn=sample_goal,
+                    goal_sample_fn=sample_goal_fn,
                     policy_fn=collect_policy_fn,
                     num_episodes=args.num_eps_collect,
                     max_steps=args.max_eps_steps,
@@ -178,7 +196,7 @@ def train_agent(args):
             net.eval()
             agm, alen = gcsl.evaluate_policy(
                 env,
-                goal_sample_fn=sample_goal,
+                goal_sample_fn=sample_goal_fn,
                 policy_fn=eval_policy_fn,
                 num_episodes=args.num_eps_eval,
                 max_steps=args.max_eps_steps,
@@ -203,6 +221,7 @@ def eval_agent(args):
     eval_policy_fn = gcsl.make_policy_fn(net, greedy=True)
     if args.seed is not None:
         np.random.seed(args.seed)
+
     if args.dynamic_goal:
         # In case the goal is dynamic, we linearly interpolate the goal
         # position between xmin, xmax over max-steps
@@ -214,6 +233,9 @@ def eval_agent(args):
             g[0] = pos
             return g
 
+    elif args.coop:
+        goal_sample_fn = sample_goal_coop
+        goal_dyn_fn = None
     else:
         goal_sample_fn = partial(sample_goal, xrange=(args.goal_xmin, args.goal_xmax))
         goal_dyn_fn = None
@@ -282,6 +304,9 @@ def main():
     parser_train.add_argument(
         "-render-freq", type=int, default=50, help="render every nth episode of eval"
     )
+    parser_train.add_argument(
+        "--coop", action="store_true", help="train for the human/agent coop scenario"
+    )
 
     # Parser for evaluation
     parser_eval = subparsers.add_parser("eval", help="eval cartpole agent")
@@ -306,6 +331,9 @@ def main():
         "--dynamic-goal",
         action="store_true",
         help="Slowly move the goal during episode between goal-xmin and goal-xmax.",
+    )
+    parser_eval.add_argument(
+        "--coop", action="store_true", help="train for the human/agent coop scenario"
     )
 
     args = parser.parse_args()

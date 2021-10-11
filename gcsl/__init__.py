@@ -89,6 +89,7 @@ def evaluate_policy(
                     env.render(mode="human", goal=goal)
                     time.sleep(0.5 if done else 0.01)
             if done:
+                print(state[1])
                 break
         if hasattr(env, "goal_metric"):
             goal_metrics.append(env.goal_metric(state, goal))
