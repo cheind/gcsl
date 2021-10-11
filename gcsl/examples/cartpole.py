@@ -151,13 +151,13 @@ class RolloutHelper:
 
 
 def train_agent(args):
+    """Main training routine."""
     ray.init()
     rollout_envs = [
         RolloutHelper.remote() for _ in range(int(ray.available_resources()["CPU"]))
     ]
 
-    """Main training routine."""
-    # Create env
+    # Create env, for evaluation purposes
     env = gym.make("CartPole-v1")
     env = CartpoleGoalRenderWrapper(env)
 
