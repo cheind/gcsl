@@ -109,7 +109,7 @@ def relabel_goal(t0: gcsl.SAGHTuple, t1: gcsl.SAGHTuple) -> gcsl.Goal:
 def sample_goal_coop(xrange: Tuple[float, float] = (-1.5, 1.5)) -> gcsl.Goal:
     """Sample a new goal. In the coop cartpole environment a goal is composed of a
     target cart-velocity and a pole angle."""
-    cart_vel = np.random.uniform(-5.0, 5.0)
+    cart_vel = np.random.uniform(-2.0, 2.0)
     pole_angle = 0.0
     return np.array([cart_vel, pole_angle], dtype=np.float32)
 
@@ -117,7 +117,7 @@ def sample_goal_coop(xrange: Tuple[float, float] = (-1.5, 1.5)) -> gcsl.Goal:
 def relabel_goal_coop(t0: gcsl.SAGHTuple, t1: gcsl.SAGHTuple) -> gcsl.Goal:
     """Relabel the goal for `t0` from state of `t1`."""
     s, _, _, _ = t1
-    cart_vel = np.clip(s[1], -5.0, 5.0)
+    cart_vel = s[1]
     pole_angle = s[2]
     return np.array([cart_vel, pole_angle], dtype=np.float32)
 
