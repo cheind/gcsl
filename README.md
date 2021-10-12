@@ -70,12 +70,20 @@ python -m gcsl.examples.cartpole play etc\cartpolenet_coop.pth
 
 ## References
 ```bibtex
-@inproceedings{
-ghosh2021learning,
-title={Learning to Reach Goals via Iterated Supervised Learning},
-author={Dibya Ghosh and Abhishek Gupta and Ashwin Reddy and Justin Fu and Coline Manon Devin and Benjamin Eysenbach and Sergey Levine},
-booktitle={International Conference on Learning Representations},
-year={2021},
-url={https://openreview.net/forum?id=rALA0Xo6yNJ}
+@inproceedings{ghosh2021learning,
+    title={Learning to Reach Goals via Iterated Supervised Learning},
+    author={Dibya Ghosh and Abhishek Gupta and Ashwin Reddy and Justin Fu and Coline Manon Devin and Benjamin Eysenbach and Sergey Levine},
+    booktitle={International Conference on Learning Representations},
+    year={2021},
+    url={https://openreview.net/forum?id=rALA0Xo6yNJ}
+}
+
+@misc{cheind2021gcsl,
+  author = {Christoph Heindl},
+  title = {Learning to Reach Goals via Iterated Supervised Learning},
+  year = {2021},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/cheind/gcsl}},
 }
 ```
