@@ -24,7 +24,7 @@ Since we condition our policy on goals, nothing stops us from changing the goals
 </div>
 
 ### Cooperative human-agent behavior
-Changing targets during execution allows us to bring humans and agents together in a cooperative team. In the following game, a human and an agent need to reach a particular cart-position as quickly as possible. They share their abilities as follows: the human observes the game (i.e., the image) and decides on the target speed of the cart (through key-presses, velocity is visualized in red). The agent's goal is then to reach that particular velocity and balance the bar. Note, if the goal is just to keep the balance, the agent's actions may counteract what the human is doing.
+Changing targets during execution allows us to bring humans and agents together in a cooperative team. In the following game, a cart should be moved to some abstract goal position. Human and agent share their abilities as follows: the human observes the game (i.e., the image) and decides on the target speed of the cart (through key-presses, velocity is visualized in red). The agent's goal is then to reach that particular velocity and balance the bar. Note, if the goal is just to keep the balance, the agent's actions may counteract what the human is doing.
 
 <div align="center">
 <img src="./etc/cartpolenet_coop.gif" width="40%">
