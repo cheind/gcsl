@@ -24,7 +24,7 @@ Since we condition our policy on goals, nothing stops us from changing the goals
 </div>
 
 ### Cooperative experiments
-Dynamically adapting goals, allows us to study something way more interesting: cooperative human-agent behavior. In the following simple game, the cart should be moved to some abstract goal position. Human and agent share their abilities as follows: the human perceives the game (i.e., through a rendered image) and continuously decides on the target velocity of the cart (through key-presses, velocity is visualized in red). The agent's perceives this target velocity as a sub-goal of its own and combines it with its pole balancing target. Note that the combination of both goals is important for the team to succeed, as otherwise, the agent's actions (pole balancing) may counteract the humans intentions (moving the cart).
+Dynamically adapting goals, allows us to study something way more interesting: cooperative human-agent behavior. In the following simple game, the cart should be moved to some abstract goal position. Human and agent share their abilities as follows: the human perceives the game (i.e., through a rendered image) and continuously decides on the target velocity of the cart (through key-presses, velocity is visualized in red). The agent's perceives this target velocity as a sub-goal of its own and combines it with its pole balancing target. Note that the combination of both goals is crucial for success, as otherwise the agent's balancing actions (pole balancing) may contradict the humans intentions (moving the cart).
 
 <div align="center">
 <img src="./etc/cartpolenet_coop.gif" width="40%">
