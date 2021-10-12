@@ -35,12 +35,12 @@ class CartpoleGoalRenderWrapper(gym.Wrapper):
     is only used for evaluation and plays no role in learning.
     """
 
-    def __init__(self, env: gym.Env) -> None:
+    def __init__(self, env: gym.Env, max_steps: int = 1500) -> None:
         super().__init__(env)
         self.goal_geom = None
         self.goal_transform = None
         self.env._max_episode_steps = (
-            1500  # otherwise we might be finished at 200/500 steps.
+            max_steps  # otherwise we might be finished at 200/500 steps.
         )
 
     def goal_metric(self, state: gcsl.State, goal: gcsl.Goal) -> float:
@@ -106,10 +106,10 @@ def relabel_goal(t0: gcsl.SAGHTuple, t1: gcsl.SAGHTuple) -> gcsl.Goal:
     return np.array([pos, pole_angle], dtype=np.float32)
 
 
-def sample_goal_coop(xrange: Tuple[float, float] = (-1.5, 1.5)) -> gcsl.Goal:
+def sample_goal_coop(xrange: Tuple[float, float] = (5.0, 5.0)) -> gcsl.Goal:
     """Sample a new goal. In the coop cartpole environment a goal is composed of a
     target cart-velocity and a pole angle."""
-    cart_vel = np.random.uniform(-5.0, 5.0)
+    cart_vel = np.random.uniform(*xrange)
     pole_angle = 0.0
     return np.array([cart_vel, pole_angle], dtype=np.float32)
 
@@ -234,7 +234,9 @@ def eval_agent(args):
             return g
 
     elif args.coop:
-        goal_sample_fn = sample_goal_coop
+        goal_sample_fn = partial(
+            sample_goal_coop, xrange=(args.goal_xmin, args.goal_xmax)
+        )
         goal_dyn_fn = None
     else:
         goal_sample_fn = partial(sample_goal, xrange=(args.goal_xmin, args.goal_xmax))
@@ -255,6 +257,60 @@ def eval_agent(args):
     print("avg-metric", avg_metric, "avg-len", avg_lens)
     if args.save_gif:
         imageio.mimsave(f"./tmp/{Path(args.weights).stem}.gif", result[-1][::2], fps=60)
+
+
+def play(args):
+    from pyglet.window import key as pygletkey
+
+    env = gym.make("CartPole-v1")
+    env = CartpoleGoalRenderWrapper(env, max_steps=100000000)
+    net = CartpolePolicyNet()
+    net.load_state_dict(torch.load(args.weights))
+    policy_fn = gcsl.make_policy_fn(net, greedy=True)
+
+    target_vel = 0.0
+    target_vel_delta = 0.0
+    key_pressed = False
+
+    def on_key_press(key, mod):
+        nonlocal target_vel_delta, key_pressed
+        if key == pygletkey.LEFT:
+            target_vel_delta = -0.1
+            key_pressed = True
+        elif key == pygletkey.RIGHT:
+            target_vel_delta = 0.1
+            key_pressed = True
+
+    def on_key_release(key, mod):
+        nonlocal target_vel_delta, key_pressed
+        if key == pygletkey.LEFT:
+            key_pressed = False
+            target_vel_delta = 0.0
+        elif key == pygletkey.RIGHT:
+            key_pressed = False
+            target_vel_delta = 0.0
+
+    def make_goal() -> gcsl.Goal:
+        cart_vel = target_vel
+        pole_angle = 0.0
+        return np.array([cart_vel, pole_angle], dtype=np.float32)
+
+    env.render("human")
+    env.env.viewer.window.on_key_press = on_key_press
+    env.env.viewer.window.on_key_release = on_key_release
+
+    state = env.reset()
+    while True:
+        target_vel += target_vel_delta
+        goal = make_goal()
+        action = policy_fn(state, goal, 0)
+        state, _, done, _ = env.step(action)
+        env.render(mode="human", goal=goal)
+        if done:
+            env.reset()
+            target_vel = 0.0
+
+    env.close()
 
 
 def main():
@@ -336,11 +392,16 @@ def main():
         "--coop", action="store_true", help="train for the human/agent coop scenario"
     )
 
+    parser_play = subparsers.add_parser("play", help="play coop cartpole agent")
+    parser_play.add_argument("weights", type=Path, help="agent policy weights")
+
     args = parser.parse_args()
     if args.command == "train":
         train_agent(args)
-    else:
+    elif args.command == "eval":
         eval_agent(args)
+    else:
+        play(args)
 
 
 if __name__ == "__main__":
