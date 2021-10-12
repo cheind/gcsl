@@ -61,6 +61,11 @@ python -m examples.cartpole eval ^
  --dynamic-goal ^
  --save-gif
 ```
+To run the coop game using a pretrained weights, use
+```
+python -m gcsl.examples.cartpole play etc\cartpolenet_coop.pth
+```
+
 
 
 ## References
