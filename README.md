@@ -30,6 +30,8 @@ Dynamically adapting goals, allows us to study something more way interesting: c
 <img src="./etc/cartpolenet_coop.gif" width="40%">
 </div>
 
+As may notice, the agent is currently not following the target velocities ideally. I suspect this is due to the current way of training, which just samples a specific velocity and then follows this velocity profile until the episode is over. I expect this to improve, when we also train with dynamic goals.
+
 ### Parallel environments
 
 The branch `parallel-ray-envs` hosts the same cartpole example but training is speed-up via [ray](https://www.ray.io/) primitives. In particular, environments rollouts are parallelized and trajectory results are incorporated on the fly. The parallel version is roughly **35% faster** than the sequential one. Its currently not merged with main, since it requires a bit more code to digest.
