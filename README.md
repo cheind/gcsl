@@ -23,6 +23,13 @@ Since we condition our policy on goals, nothing stops us from changing the goals
 <img src="./etc/cartpolenet_20000_dynamic.gif"  width="40%">
 </div>
 
+### Cooperative human-agent behavior
+Changing targets during execution allows us to bring humans and agents together in a cooperative team. In the following game, a human and an agent need to reach a particular cart-position as quickly as possible. They share their abilities as follows: the human observes the game (i.e., the image) and decides on the target speed of the cart (through key-presses, velocity is visualized in red). The agent's goal is then to reach that particular velocity and balance the bar. Note, if the goal is just to keep the balance, the agent's actions may counteract what the human is doing.
+
+<div align="center">
+<img src="./etc/cartpolenet_coop.gif" width="40%">
+</div>
+
 ### Parallel environments
 
 The branch `parallel-ray-envs` hosts the same cartpole example but training is speed-up via [ray](https://www.ray.io/) primitives. In particular, environments rollouts are parallelized and trajectory results are incorporated on the fly. The parallel version is roughly **35% faster** than the sequential one. Its currently not merged with main, since it requires a bit more code to digest.

@@ -270,25 +270,23 @@ def play(args):
 
     target_vel = 0.0
     target_vel_delta = 0.0
-    key_pressed = False
+    exit_game = False
 
     def on_key_press(key, mod):
-        nonlocal target_vel_delta, key_pressed
+        nonlocal target_vel_delta
         if key == pygletkey.LEFT:
-            target_vel_delta = -0.1
-            key_pressed = True
+            target_vel_delta = -0.2
         elif key == pygletkey.RIGHT:
-            target_vel_delta = 0.1
-            key_pressed = True
+            target_vel_delta = 0.2
 
     def on_key_release(key, mod):
-        nonlocal target_vel_delta, key_pressed
+        nonlocal target_vel_delta, exit_game
         if key == pygletkey.LEFT:
-            key_pressed = False
             target_vel_delta = 0.0
         elif key == pygletkey.RIGHT:
-            key_pressed = False
             target_vel_delta = 0.0
+        elif key == pygletkey.ESCAPE:
+            exit_game = True
 
     def make_goal() -> gcsl.Goal:
         cart_vel = target_vel
@@ -300,16 +298,22 @@ def play(args):
     env.env.viewer.window.on_key_release = on_key_release
 
     state = env.reset()
+    imgs = []
     while True:
         target_vel += target_vel_delta
         goal = make_goal()
         action = policy_fn(state, goal, 0)
         state, _, done, _ = env.step(action)
         env.render(mode="human", goal=goal)
+        if args.save_gif:
+            imgs.append(env.render(mode="rgb_array", goal=goal))
         if done:
             env.reset()
             target_vel = 0.0
-
+        if exit_game:
+            break
+    if args.save_gif:
+        imageio.mimsave(f"./tmp/{Path(args.weights).stem}.gif", imgs, fps=30)
     env.close()
 
 
@@ -394,6 +398,9 @@ def main():
 
     parser_play = subparsers.add_parser("play", help="play coop cartpole agent")
     parser_play.add_argument("weights", type=Path, help="agent policy weights")
+    parser_play.add_argument(
+        "--save-gif", action="store_true", help="save animated gif"
+    )
 
     args = parser.parse_args()
     if args.command == "train":
