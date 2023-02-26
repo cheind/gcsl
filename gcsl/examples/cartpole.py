@@ -10,8 +10,7 @@ Training in this environment is tricky, since the ends episodes when the pole an
 slightly off from zero. This prevents the agent from gaining experiences far from its
 starting location that is always around the center of the world.
 """
-
-
+import os.path
 from functools import partial
 from pathlib import Path
 from typing import List, Tuple
@@ -88,6 +87,7 @@ class CartpolePolicyNet(torch.nn.Module):
     def forward(self, s, g, h):
         del h
         x = torch.cat((s, g), -1)
+        x = x.float()
         logits = self.logits(x)
         return logits
 
@@ -236,6 +236,8 @@ def train_agent(args):
             postfix_dict["alen"] = alen
             postfix_dict["agm"] = agm
             net.train()
+            if not os.path.isdir('./tmp/'):
+                os.mkdir('./tmp/')
             torch.save(net.state_dict(), f"./tmp/cartpolenet_{e:05d}.pth")
         if e % 100 == 0:
             pbar.set_postfix(postfix_dict)
@@ -281,6 +283,8 @@ def eval_agent(args):
     avg_metric, avg_lens = result[:2]
     print("avg-metric", avg_metric, "avg-len", avg_lens)
     if args.save_gif:
+        if not os.path.isdir('./tmp/'):
+            os.mkdir('./tmp/')
         imageio.mimsave(f"./tmp/{Path(args.weights).stem}.gif", result[-1][::2], fps=60)
 
 
